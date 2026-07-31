@@ -100,8 +100,10 @@ it touched, and none of the 5 changed files have any lint/typecheck/format
 issues of their own.
 
 **Next steps:**
-Open a draft PR against `ascherj/pathreview` for early feedback, then
-request a peer/mentor review in Slack before marking it ready for review.
+PR #199 against `ascherj/pathreview` was already open from before Week 8
+but had an empty template body — filled it in with the real summary,
+changes, and testing/verification details this week. Still need to
+request peer/mentor review in Slack.
 
 **Blockers:**
 None.
@@ -110,7 +112,7 @@ None.
 
 ### Check-in 2 (end of week)
 
-**PR link:** _pending — added once opened_
+**PR link:** https://github.com/ascherj/pathreview/pull/199
 
 **Branch:** `fix/47-persist-agent-progress-across-restarts`
 
@@ -133,5 +135,6 @@ _(both confirmed with zero new failures relative to this branch's base
 commit — see Check-in 1 for the verification method; full breakdown in the
 PR description)_
 
-**Draft PR feedback received from:** _pending — requesting review in Slack
-after opening the draft PR_
+**Draft PR feedback received from:** none yet — PR was already open
+(not draft) from before Week 8; requesting peer/mentor review in Slack
+this week
