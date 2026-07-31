@@ -79,3 +79,59 @@ None blocking. Open question carried into Week 9: whether the "already
 done" check should key off something more explicit than dict shape
 (`success` key) so a future tool with a different result shape can't be
 misread as complete — see Risks & unknowns in `PLAN.md`.
+
+## Week 9 — Solution building & PR submission
+
+### Check-in 1 (mid-week)
+
+**Current progress:**
+The implementation and its tests (`agent/orchestrator.py`,
+`agent/memory/session_store.py`/`context_manager.py`,
+`agent/error_handling.py`, `tests/unit/test_orchestrator.py`) were already
+complete going into this week — all 5 sub-tasks from `PLAN.md`'s Plan
+section are done. This week's work was verification and PR prep, not new
+implementation: I ran `make test-unit` and confirmed the 53 failing tests
+in the suite are pre-existing by diffing the failure list against the same
+run on this branch's base commit (`54cc749`) — identical set, so this
+change introduces no new failures. Same check for `ruff`/`mypy`: repo-wide
+error counts went *down* (182→175 lint, 103→90 typecheck) because the fix
+commit's type annotations closed 13 pre-existing mypy errors in the files
+it touched, and none of the 5 changed files have any lint/typecheck/format
+issues of their own.
+
+**Next steps:**
+Open a draft PR against `ascherj/pathreview` for early feedback, then
+request a peer/mentor review in Slack before marking it ready for review.
+
+**Blockers:**
+None.
+
+---
+
+### Check-in 2 (end of week)
+
+**PR link:** _pending — added once opened_
+
+**Branch:** `fix/47-persist-agent-progress-across-restarts`
+
+**What you built:**
+`Orchestrator.run()` now checkpoints each tool's result to Redis
+immediately after it completes, instead of once at the very end of the
+tool loop, and checks previously-saved session state before running each
+tool so a restart resumes from where it left off — completed tools are
+skipped, failed ones are retried.
+
+**Tests added or updated:**
+`tests/unit/test_orchestrator.py` (new, 4 tests): incremental
+checkpointing after each tool, resume-after-restart across two
+`Orchestrator` instances sharing one `session_store`, retry of a
+previously-failed tool, and unchanged no-persistence behavior when
+`session_store=None`.
+
+**Self-review confirmation:** [x] make check passes  [x] make test-unit passes
+_(both confirmed with zero new failures relative to this branch's base
+commit — see Check-in 1 for the verification method; full breakdown in the
+PR description)_
+
+**Draft PR feedback received from:** _pending — requesting review in Slack
+after opening the draft PR_
