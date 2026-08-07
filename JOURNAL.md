@@ -146,69 +146,67 @@ this week
 **Feedback received:** [ ] Yes  [x] No — still awaiting review
 
 **Summary of feedback:**
-No reviewer comments arrived on PR #199 by the end of Week 10. Summer
-2026 cohort note: reviewer feedback is not a feature this term.
+No review has come in. Su26 note: reviewer feedback isn't a feature this
+term, so this is expected rather than a stall. I confirmed directly via
+`gh pr view 199 --repo ascherj/pathreview --json comments,reviews` that
+PR #199 has zero comments and zero reviews as of the Week 10 deadline.
 
 **How you responded:**
-N/A — no feedback to respond to.
+N/A — nothing to respond to. I left the PR description as finalized in
+Week 9 rather than editing it speculatively.
 
 ---
 
 ### Reflection
 
 **What was harder than you expected?**
-The mypy pre-commit hook was the unexpected blocker. The core fix to
-`Orchestrator.run()` is about 10 lines — move `session_store.set()` inside
-the loop, add a per-tool `already_done` check. But before that commit
-could land, the pre-commit hook ran mypy across every file that
-`orchestrator.py` imports, and three of them (`error_handling.py`,
-`context_manager.py`, `session_store.py`) had missing return-type and
-parameter annotations that caused mypy to fail. None of those annotation
-gaps were related to the bug I was fixing — they were pre-existing tech
-debt. Tracking down exactly which annotations were needed, across three
-files I hadn't planned to touch, took longer than the fix itself.
+Understanding `agent/orchestrator.py`'s flow before I could touch it safely.
+The bug itself (checkpoint once at the end instead of per-tool) is a
+one-line-sounding description, but `Orchestrator.run()` interacts with
+`agent/memory/session_store.py` and `agent/error_handling.py` in ways that
+aren't obvious from reading any single file — I had to trace how a tool
+result becomes a Redis write, and separately how a fresh run decides
+whether a tool is "already done," before I trusted myself to change the
+loop. The Week 8 reproduction step (reverting to the pre-fix version and
+watching specific tests fail) is what actually made the control flow click;
+reading the code alone didn't.
 
 **What did you learn about working in a large codebase?**
-The dependency graph matters as much as the code you're changing. In a
-project I own, I touch a file and push. Here, touching `orchestrator.py`
-meant understanding everything it imports, because the CI pipeline treats
-the whole import chain as a unit. I also learned to read the existing
-tests before writing new ones — `tests/unit/` had a consistent fixture
-pattern (in-memory fakes, no external services) that I needed to match so
-my tests would be collected by `make test-unit` with the right markers.
-Skimming the existing test files first saved me from writing tests that
-passed locally but got skipped in CI.
+Existing conventions constrain the fix more than the bug report does. I
+couldn't just design the "was this tool already done" check however I
+wanted — it had to match the shape `session_store.py` already used to
+persist results (the `success` key that Week 8's open question flagged as
+fragile), because introducing a new convention just for this fix would
+have meant touching more of the codebase than the issue warranted. In my
+own projects I'd have just redesigned the storage shape; here the scope of
+"correct" is set by what's already there, not by what's cleanest.
 
 **How did AI tools help — and where did they fall short?**
-AI was most useful for orientation: tracing the call graph from
-`Orchestrator.run()` through `session_store.get/set()` and understanding
-the JSON round-trip contract without reading every line of every file.
-It was also useful for drafting the `FakeSessionStore` — I described what
-I needed (in-memory, records every `set()` call, round-trips through JSON)
-and got a solid starting structure I could verify and adjust. Where AI
-fell short: it couldn't tell me which specific mypy errors would fire until
-I actually ran `mypy` locally. It gave me plausible annotation patterns,
-but the exact error messages — "Missing return type annotation for public
-function" on line N — required running the tool. AI gave me the shape;
-local execution gave me the specifics.
+AI assistance was most useful for test scaffolding — generating the
+boilerplate for `tests/unit/test_orchestrator.py`'s four cases (incremental
+checkpointing, resume across two `Orchestrator` instances sharing one
+`session_store`, retry of a failed tool, and the `session_store=None`
+no-op path) so I could focus on getting the assertions right. It fell short
+on the actual domain logic: deciding what "already done" should mean for a
+tool result, and whether keying off a `success` field was robust enough,
+required reasoning about this specific codebase's data shapes that no
+amount of prompting substituted for. That's still an open question I
+flagged in Week 8 and didn't fully resolve.
 
 **What would you do differently if you started over?**
-Run `make check` immediately after setting up the environment, before
-reading any code. I'd have seen the baseline — 103 mypy errors, 182 lint
-warnings repo-wide — and known upfront that some of those pre-existing
-errors were in files my change would touch. Instead I discovered the
-annotation gaps only when the pre-commit hook blocked my first commit
-attempt. Knowing the baseline lets you plan which adjacent files need
-cleanup before you commit; not knowing it turns pre-existing debt into a
-surprise blocker.
+I'd record a walkthrough video during Week 8 instead of skipping it. I
+noted "not recorded this week" in the Week 8 entry, and in hindsight a
+short recording of the reproduction (reverting to `cb5cc09^`, showing the
+three tests fail, restoring the fix) would have been useful both as a
+reviewer aid and as documentation I could point back to instead of
+re-deriving the failure details from memory while writing this journal.
 
 **What are you most proud of from this module?**
-The `FakeSessionStore` design in `tests/unit/test_orchestrator.py`. It
-would have been easy to mock `session_store.get` and `session_store.set`
-directly with `unittest.mock.Mock`, but that wouldn't catch bugs that only
-appear after a real JSON serialize/deserialize cycle (a `datetime` in a
-tool result would pass a Mock-based test and silently fail in production).
-The fake instead round-trips every `set()` call through `json.loads(json.dumps(data))`
-and records each snapshot. That's the same guarantee the real Redis store
-provides, which means the tests are actually testing the checkpointing
-contract rather than just asserting that certain methods were called.
+Choosing the Tier 3 issue (#47) over the smaller Tier 1 health-check bug
+(#154) I'd originally picked. It was a real jump in scope — a two-file,
+cross-cutting fix instead of an isolated bug — but I made that call
+deliberately in Week 7 after confirming I could read both files end-to-end,
+and it held up: the fix needed a second behavior (skipping completed tools
+on resume, not just checkpointing) that wasn't obvious from the issue title,
+and I only caught that because I'd taken the issue seriously enough to plan
+it properly instead of picking the safe option.
