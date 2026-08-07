@@ -138,3 +138,75 @@ PR description)_
 **Draft PR feedback received from:** none yet — PR was already open
 (not draft) from before Week 8; requesting peer/mentor review in Slack
 this week
+
+## Week 10 — Iteration & reflection
+
+### Reviewer feedback
+
+**Feedback received:** [ ] Yes  [x] No — still awaiting review
+
+**Summary of feedback:**
+No review has come in. Su26 note: reviewer feedback isn't a feature this
+term, so this is expected rather than a stall. I confirmed directly via
+`gh pr view 199 --repo ascherj/pathreview --json comments,reviews` that
+PR #199 has zero comments and zero reviews as of the Week 10 deadline.
+
+**How you responded:**
+N/A — nothing to respond to. I left the PR description as finalized in
+Week 9 rather than editing it speculatively.
+
+---
+
+### Reflection
+
+**What was harder than you expected?**
+Understanding `agent/orchestrator.py`'s flow before I could touch it safely.
+The bug itself (checkpoint once at the end instead of per-tool) is a
+one-line-sounding description, but `Orchestrator.run()` interacts with
+`agent/memory/session_store.py` and `agent/error_handling.py` in ways that
+aren't obvious from reading any single file — I had to trace how a tool
+result becomes a Redis write, and separately how a fresh run decides
+whether a tool is "already done," before I trusted myself to change the
+loop. The Week 8 reproduction step (reverting to the pre-fix version and
+watching specific tests fail) is what actually made the control flow click;
+reading the code alone didn't.
+
+**What did you learn about working in a large codebase?**
+Existing conventions constrain the fix more than the bug report does. I
+couldn't just design the "was this tool already done" check however I
+wanted — it had to match the shape `session_store.py` already used to
+persist results (the `success` key that Week 8's open question flagged as
+fragile), because introducing a new convention just for this fix would
+have meant touching more of the codebase than the issue warranted. In my
+own projects I'd have just redesigned the storage shape; here the scope of
+"correct" is set by what's already there, not by what's cleanest.
+
+**How did AI tools help — and where did they fall short?**
+AI assistance was most useful for test scaffolding — generating the
+boilerplate for `tests/unit/test_orchestrator.py`'s four cases (incremental
+checkpointing, resume across two `Orchestrator` instances sharing one
+`session_store`, retry of a failed tool, and the `session_store=None`
+no-op path) so I could focus on getting the assertions right. It fell short
+on the actual domain logic: deciding what "already done" should mean for a
+tool result, and whether keying off a `success` field was robust enough,
+required reasoning about this specific codebase's data shapes that no
+amount of prompting substituted for. That's still an open question I
+flagged in Week 8 and didn't fully resolve.
+
+**What would you do differently if you started over?**
+I'd record a walkthrough video during Week 8 instead of skipping it. I
+noted "not recorded this week" in the Week 8 entry, and in hindsight a
+short recording of the reproduction (reverting to `cb5cc09^`, showing the
+three tests fail, restoring the fix) would have been useful both as a
+reviewer aid and as documentation I could point back to instead of
+re-deriving the failure details from memory while writing this journal.
+
+**What are you most proud of from this module?**
+Choosing the Tier 3 issue (#47) over the smaller Tier 1 health-check bug
+(#154) I'd originally picked. It was a real jump in scope — a two-file,
+cross-cutting fix instead of an isolated bug — but I made that call
+deliberately in Week 7 after confirming I could read both files end-to-end,
+and it held up: the fix needed a second behavior (skipping completed tools
+on resume, not just checkpointing) that wasn't obvious from the issue title,
+and I only caught that because I'd taken the issue seriously enough to plan
+it properly instead of picking the safe option.
