@@ -138,3 +138,77 @@ PR description)_
 **Draft PR feedback received from:** none yet — PR was already open
 (not draft) from before Week 8; requesting peer/mentor review in Slack
 this week
+
+## Week 10 — Iteration & reflection
+
+### Reviewer feedback
+
+**Feedback received:** [ ] Yes  [x] No — still awaiting review
+
+**Summary of feedback:**
+No reviewer comments arrived on PR #199 by the end of Week 10. Summer
+2026 cohort note: reviewer feedback is not a feature this term.
+
+**How you responded:**
+N/A — no feedback to respond to.
+
+---
+
+### Reflection
+
+**What was harder than you expected?**
+The mypy pre-commit hook was the unexpected blocker. The core fix to
+`Orchestrator.run()` is about 10 lines — move `session_store.set()` inside
+the loop, add a per-tool `already_done` check. But before that commit
+could land, the pre-commit hook ran mypy across every file that
+`orchestrator.py` imports, and three of them (`error_handling.py`,
+`context_manager.py`, `session_store.py`) had missing return-type and
+parameter annotations that caused mypy to fail. None of those annotation
+gaps were related to the bug I was fixing — they were pre-existing tech
+debt. Tracking down exactly which annotations were needed, across three
+files I hadn't planned to touch, took longer than the fix itself.
+
+**What did you learn about working in a large codebase?**
+The dependency graph matters as much as the code you're changing. In a
+project I own, I touch a file and push. Here, touching `orchestrator.py`
+meant understanding everything it imports, because the CI pipeline treats
+the whole import chain as a unit. I also learned to read the existing
+tests before writing new ones — `tests/unit/` had a consistent fixture
+pattern (in-memory fakes, no external services) that I needed to match so
+my tests would be collected by `make test-unit` with the right markers.
+Skimming the existing test files first saved me from writing tests that
+passed locally but got skipped in CI.
+
+**How did AI tools help — and where did they fall short?**
+AI was most useful for orientation: tracing the call graph from
+`Orchestrator.run()` through `session_store.get/set()` and understanding
+the JSON round-trip contract without reading every line of every file.
+It was also useful for drafting the `FakeSessionStore` — I described what
+I needed (in-memory, records every `set()` call, round-trips through JSON)
+and got a solid starting structure I could verify and adjust. Where AI
+fell short: it couldn't tell me which specific mypy errors would fire until
+I actually ran `mypy` locally. It gave me plausible annotation patterns,
+but the exact error messages — "Missing return type annotation for public
+function" on line N — required running the tool. AI gave me the shape;
+local execution gave me the specifics.
+
+**What would you do differently if you started over?**
+Run `make check` immediately after setting up the environment, before
+reading any code. I'd have seen the baseline — 103 mypy errors, 182 lint
+warnings repo-wide — and known upfront that some of those pre-existing
+errors were in files my change would touch. Instead I discovered the
+annotation gaps only when the pre-commit hook blocked my first commit
+attempt. Knowing the baseline lets you plan which adjacent files need
+cleanup before you commit; not knowing it turns pre-existing debt into a
+surprise blocker.
+
+**What are you most proud of from this module?**
+The `FakeSessionStore` design in `tests/unit/test_orchestrator.py`. It
+would have been easy to mock `session_store.get` and `session_store.set`
+directly with `unittest.mock.Mock`, but that wouldn't catch bugs that only
+appear after a real JSON serialize/deserialize cycle (a `datetime` in a
+tool result would pass a Mock-based test and silently fail in production).
+The fake instead round-trips every `set()` call through `json.loads(json.dumps(data))`
+and records each snapshot. That's the same guarantee the real Redis store
+provides, which means the tests are actually testing the checkpointing
+contract rather than just asserting that certain methods were called.
